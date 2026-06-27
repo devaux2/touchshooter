@@ -20,6 +20,8 @@ export const CONFIG = {
     damage: 1,
     hitFlashTime: 0.25,
     shotTravel: 0.7, // seconds for an incoming shot to reach you (dodge window)
+    hideMin: 0.6, // shortest pause in cover before popping up again, seconds
+    hideMax: 1.6, // longest pause in cover before popping up again, seconds
   },
 
   combat: {

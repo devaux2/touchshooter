@@ -9,14 +9,16 @@ const State = {
   RISING: "rising",
   AIMING: "aiming",
   RETREATING: "retreating",
+  HIDING: "hiding",
   DYING: "dying",
   DONE: "done",
 };
 
 // A single placeholder foe built from primitive meshes (capsule body + sphere
-// head + a gun box). It runs a small state machine: emerge from cover, take aim
-// (telegraphed by turning red), fire one shot, then duck back down. Shooting it
-// at any point before it retreats kills it.
+// head + a gun box). It loops a small state machine: emerge from cover, take aim
+// (telegraphed by turning red), fire a shot, duck back down, wait, then emerge
+// again — repeating until the player shoots it. It only leaves the wave when
+// killed, so the player must clear every enemy to advance.
 class Enemy {
   constructor(scene, manager, spec) {
     this.scene = scene;
@@ -134,7 +136,20 @@ class Enemy {
       case State.RETREATING:
         if (this.flash.isVisible && this.t > 0.08) this.flash.isVisible = false;
         this._setEmerge(1 - this.t / e.riseTime);
-        if (this.t >= e.riseTime) this._finish();
+        if (this.t >= e.riseTime) {
+          // Duck back into cover and wait before popping up to fire again.
+          this.state = State.HIDING;
+          this.t = 0;
+          this.hideTime = e.hideMin + Math.random() * (e.hideMax - e.hideMin);
+          this._resetColor();
+        }
+        break;
+
+      case State.HIDING:
+        if (this.t >= this.hideTime) {
+          this.state = State.RISING;
+          this.t = 0;
+        }
         break;
 
       case State.DYING:
@@ -150,6 +165,12 @@ class Enemy {
     this.hasFired = true;
     this.flash.isVisible = true;
     this.manager.onEnemyFire(this);
+  }
+
+  // Restore the base colour after a fire cycle so the next aim re-telegraphs.
+  _resetColor() {
+    this.bodyMat.diffuseColor = B.Color3.FromHexString(this.spec.color || "#3a6ea5");
+    this.bodyMat.emissiveColor = new B.Color3(0, 0, 0);
   }
 
   // World-space position of the gun muzzle, used as a projectile's origin.
