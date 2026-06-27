@@ -1,13 +1,17 @@
 import { CONFIG } from "./config.js";
 
-// Translates raw pointer/touch events into the two game gestures:
+// Translates raw input into the two game actions — shoot, and duck/reload —
+// across both touch and desktop:
 //
-//   * a single tap            -> fire a shot at that screen point
-//   * a double-tap that holds -> duck (and reload) until the finger lifts
+//   Touch / pen:
+//     * single tap            -> fire at that point
+//     * double-tap that holds -> duck (and reload) until the finger lifts
+//   Desktop:
+//     * left mouse click      -> fire at the cursor
+//     * hold Space            -> duck (and reload) until released
 //
-// The first tap of a double always fires — that mirrors arcade light-gun feel,
-// where you shoot and then duck — and the quick second press is what triggers
-// the duck/hold. Works for both touch and mouse so it is testable on desktop.
+// Duck can be requested by more than one source (a held finger and the Space
+// key); the view only stands back up once every source has released.
 export class InputManager {
   constructor(canvas, { onFire, onDuckStart, onDuckEnd, onAim }) {
     this.canvas = canvas;
@@ -20,50 +24,79 @@ export class InputManager {
     this.lastTapTime = -Infinity;
     this.lastFireTime = -Infinity;
     this.activePointerId = null;
-    this.isDuckGesture = false;
+
+    // Duck sources, combined in _refreshDuck().
+    this.touchDuck = false;
+    this.keyDuck = false;
+    this.duckActive = false;
 
     this._bind();
   }
 
   _bind() {
-    // Use pointer events so a single code path covers touch, pen and mouse.
+    // Pointer events cover touch, pen and mouse in one path.
     this.canvas.addEventListener("pointerdown", (e) => this._down(e));
     this.canvas.addEventListener("pointerup", (e) => this._up(e));
     this.canvas.addEventListener("pointercancel", (e) => this._up(e));
     this.canvas.addEventListener("pointermove", (e) => this._move(e));
-    // Stop the browser from turning quick taps into synthetic mouse / zoom.
+    // Stop the browser turning quick taps / right-clicks into menus or zoom.
     this.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     this.canvas.addEventListener("dblclick", (e) => e.preventDefault());
+
+    // Keyboard: Space ducks/reloads on desktop.
+    window.addEventListener("keydown", (e) => this._key(e, true));
+    window.addEventListener("keyup", (e) => this._key(e, false));
   }
 
   setEnabled(on) {
     this.enabled = on;
-    if (!on) this._cancelDuck();
+    if (!on) {
+      this.touchDuck = false;
+      this.keyDuck = false;
+      this._refreshDuck();
+    }
   }
 
   _now() {
     return performance.now();
   }
 
+  // Fold all duck sources into a single start/stop so releasing one source
+  // doesn't stand you up while another is still held.
+  _refreshDuck() {
+    const want = this.touchDuck || this.keyDuck;
+    if (want === this.duckActive) return;
+    this.duckActive = want;
+    if (want) {
+      if (this.onDuckStart) this.onDuckStart();
+    } else if (this.onDuckEnd) {
+      this.onDuckEnd();
+    }
+  }
+
   _down(e) {
     if (!this.enabled) return;
+    // Only the left mouse button shoots; ignore right/middle.
+    if (e.pointerType === "mouse" && e.button !== 0) return;
     e.preventDefault();
-
-    const now = this._now();
-    const sinceLast = now - this.lastTapTime;
-    this.lastTapTime = now;
 
     if (this.onAim) this.onAim(e.clientX, e.clientY);
 
-    // Second press of a double-tap, and we are not already ducking: start duck.
-    if (sinceLast < CONFIG.input.doubleTapWindow && !this.isDuckGesture) {
-      this.isDuckGesture = true;
-      this.activePointerId = e.pointerId;
-      if (this.onDuckStart) this.onDuckStart();
-      return;
+    const now = this._now();
+
+    // Touch/pen only: a quick second press becomes the duck/hold gesture. On a
+    // mouse, every left click just fires (Space is the duck key instead).
+    if (e.pointerType !== "mouse") {
+      const sinceLast = now - this.lastTapTime;
+      this.lastTapTime = now;
+      if (sinceLast < CONFIG.input.doubleTapWindow && !this.touchDuck) {
+        this.touchDuck = true;
+        this.activePointerId = e.pointerId;
+        this._refreshDuck();
+        return;
+      }
     }
 
-    // Otherwise this is a shot.
     if (now - this.lastFireTime >= CONFIG.input.fireCooldown) {
       this.lastFireTime = now;
       if (this.onFire) this.onFire(e.clientX, e.clientY);
@@ -77,15 +110,20 @@ export class InputManager {
 
   _up(e) {
     if (!this.enabled) return;
-    if (this.isDuckGesture && e.pointerId === this.activePointerId) {
-      this._cancelDuck();
+    if (this.touchDuck && e.pointerId === this.activePointerId) {
+      this.touchDuck = false;
+      this.activePointerId = null;
+      this._refreshDuck();
     }
   }
 
-  _cancelDuck() {
-    if (!this.isDuckGesture) return;
-    this.isDuckGesture = false;
-    this.activePointerId = null;
-    if (this.onDuckEnd) this.onDuckEnd();
+  _key(e, down) {
+    if (e.code !== "Space") return;
+    // Always swallow Space so it can't scroll the page or re-trigger a button.
+    e.preventDefault();
+    if (!this.enabled) return;
+    if (down && e.repeat) return; // ignore auto-repeat while held
+    this.keyDuck = down;
+    this._refreshDuck();
   }
 }

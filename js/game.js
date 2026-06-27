@@ -121,6 +121,10 @@ export class Game {
   // Lifecycle
   // -------------------------------------------------------------------------
   start() {
+    // Drop focus from the START button so Space ducks instead of re-clicking it.
+    if (document.activeElement && document.activeElement.blur) {
+      document.activeElement.blur();
+    }
     this._goFullscreen();
     this.hud.hideOverlay();
     this.hud.showGame(true);
