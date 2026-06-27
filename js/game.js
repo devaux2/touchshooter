@@ -317,6 +317,7 @@ export class Game {
     this.hud.setHealth(this.player.health, this.player.maxHealth);
     this.hud.setAmmo(this.player.ammo, this.player.magazine);
     this.hud.setScore(this.score);
+    this.hud.setEnemies(0);
   }
 
   // Ask the browser for real fullscreen + landscape. Best-effort: iOS Safari on
@@ -440,8 +441,9 @@ export class Game {
     const dt = Math.min(0.05, this.engine.getDeltaTime() / 1000);
 
     this.player.update(dt);
-    // Reflect reload completion on the HUD.
+    // Reflect reload completion and remaining enemies on the HUD.
     this.hud.setAmmo(this.player.ammo, this.player.magazine);
+    this.hud.setEnemies(this.enemies.remaining);
 
     // Animate the duck dip toward its target every frame.
     const duckSpeed = CONFIG.camera.duckDrop / CONFIG.player.duckRiseTime;

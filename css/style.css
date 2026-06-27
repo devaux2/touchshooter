@@ -101,27 +101,73 @@ body {
   transform: scale(0.85);
 }
 
-#ammo {
+/* Vertical icon columns hugging the left (foes) and right (bullets) edges. */
+.iconCol {
   position: absolute;
-  bottom: 22px;
-  right: 26px;
-  font-weight: bold;
-  text-shadow: var(--shadow);
-  font-variant-numeric: tabular-nums;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
 }
 
-#ammoCount {
-  font-size: 40px;
-  color: var(--ink);
+#foes {
+  left: 14px;
+  align-items: flex-start;
 }
 
-#ammoMax {
-  font-size: 22px;
-  opacity: 0.7;
+#bullets {
+  right: 16px;
+  align-items: flex-end;
 }
 
-#ammo.low #ammoCount {
-  color: var(--accent);
+/* Enemy silhouette: a head over a body, in enemy red. */
+.foe {
+  position: relative;
+  width: 16px;
+  height: 21px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.55));
+}
+
+.foe::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 50%;
+  background: #e6543b;
+}
+
+.foe::after {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  width: 15px;
+  height: 14px;
+  margin-left: -7.5px;
+  border-radius: 7px 7px 4px 4px;
+  background: #e6543b;
+}
+
+/* A single round; spent rounds dim out so the magazine reads at a glance. */
+.bullet {
+  width: 8px;
+  height: 17px;
+  border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(#ffe08a, #d8992a);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.12s, transform 0.12s, background 0.12s;
+}
+
+.bullet.spent {
+  background: #3a3a3a;
+  opacity: 0.4;
+  transform: scale(0.8);
 }
 
 #reloadHint {

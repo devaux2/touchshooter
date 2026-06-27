@@ -8,9 +8,8 @@ export class Hud {
       location: document.getElementById("location"),
       score: document.getElementById("score"),
       health: document.getElementById("health"),
-      ammo: document.getElementById("ammo"),
-      ammoCount: document.getElementById("ammoCount"),
-      ammoMax: document.getElementById("ammoMax"),
+      foes: document.getElementById("foes"),
+      bullets: document.getElementById("bullets"),
       crosshair: document.getElementById("crosshair"),
       reloadHint: document.getElementById("reloadHint"),
       cover: document.getElementById("cover"),
@@ -23,6 +22,8 @@ export class Hud {
       rotateNotice: document.getElementById("rotateNotice"),
     };
     this._builtHealth = -1;
+    this._builtMag = -1;
+    this._foeCount = -1;
   }
 
   showGame(show) {
@@ -53,10 +54,32 @@ export class Hud {
     this._hearts.forEach((h, i) => h.classList.toggle("empty", i >= health));
   }
 
+  // Bullet icons: one slot per magazine round; spent rounds dim out.
   setAmmo(ammo, max) {
-    this.el.ammoCount.textContent = ammo;
-    this.el.ammoMax.textContent = "/" + max;
-    this.el.ammo.classList.toggle("low", ammo <= 2);
+    if (this._builtMag !== max) {
+      this.el.bullets.innerHTML = "";
+      this._bullets = [];
+      for (let i = 0; i < max; i++) {
+        const b = document.createElement("div");
+        b.className = "bullet";
+        this.el.bullets.appendChild(b);
+        this._bullets.push(b);
+      }
+      this._builtMag = max;
+    }
+    this._bullets.forEach((b, i) => b.classList.toggle("spent", i >= ammo));
+  }
+
+  // Enemy icons: one silhouette per enemy still left to shoot in the wave.
+  setEnemies(remaining) {
+    if (this._foeCount === remaining) return;
+    this._foeCount = remaining;
+    this.el.foes.innerHTML = "";
+    for (let i = 0; i < remaining; i++) {
+      const f = document.createElement("div");
+      f.className = "foe";
+      this.el.foes.appendChild(f);
+    }
   }
 
   setDucking(on) {

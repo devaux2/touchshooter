@@ -198,6 +198,11 @@ class Enemy {
     return this.state === State.DONE;
   }
 
+  // True once the player has shot it (dying or gone) — no longer a live threat.
+  get killed() {
+    return this.state === State.DYING || this.state === State.DONE;
+  }
+
   dispose() {
     if (this._disposed) return;
     this._disposed = true;
@@ -262,5 +267,13 @@ export class EnemyManager {
   // The wave is over once every queued enemy has spawned and resolved.
   get resolved() {
     return this.spawnedAll && this.enemies.length === 0;
+  }
+
+  // Enemies the player still has to shoot: those waiting to spawn plus those
+  // currently alive (not yet killed). Drives the HUD's remaining-enemy icons.
+  get remaining() {
+    let live = 0;
+    for (const e of this.enemies) if (!e.killed) live++;
+    return this.pending.length + live;
   }
 }
