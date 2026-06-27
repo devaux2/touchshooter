@@ -152,6 +152,11 @@ class Enemy {
     this.manager.onEnemyFire(this);
   }
 
+  // World-space position of the gun muzzle, used as a projectile's origin.
+  muzzleWorld() {
+    return this.flash.getAbsolutePosition();
+  }
+
   // Called by the shooting code when this enemy is hit by the player.
   kill(quick) {
     if (this.state === State.DYING || this.state === State.DONE) return false;
@@ -181,9 +186,9 @@ class Enemy {
 
 // Owns the live set of enemies and drives a per-waypoint spawn schedule.
 export class EnemyManager {
-  constructor(scene, { onPlayerHit, onScore }) {
+  constructor(scene, { onProjectile, onScore }) {
     this.scene = scene;
-    this.onPlayerHit = onPlayerHit;
+    this.onProjectile = onProjectile;
     this.onScore = onScore;
     this.enemies = [];
     this.pending = []; // queued spawns: { delay, spec }
@@ -223,7 +228,8 @@ export class EnemyManager {
   }
 
   onEnemyFire(enemy) {
-    if (this.onPlayerHit) this.onPlayerHit(CONFIG.enemy.damage, enemy);
+    // The shot is now a visible projectile; the Game applies damage on impact.
+    if (this.onProjectile) this.onProjectile(enemy);
   }
 
   onKill(enemy, quick) {

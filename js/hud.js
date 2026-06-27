@@ -13,6 +13,8 @@ export class Hud {
       ammoMax: document.getElementById("ammoMax"),
       crosshair: document.getElementById("crosshair"),
       reloadHint: document.getElementById("reloadHint"),
+      cover: document.getElementById("cover"),
+      coverBadge: document.getElementById("coverBadge"),
       fade: document.getElementById("fade"),
       overlay: document.getElementById("overlay"),
       overlayTitle: document.getElementById("overlayTitle"),
@@ -59,6 +61,8 @@ export class Hud {
 
   setDucking(on) {
     this.el.hud.classList.toggle("ducking", on);
+    this.el.cover.classList.toggle("on", on);
+    this.el.coverBadge.classList.toggle("on", on);
   }
 
   aim(x, y) {

@@ -35,9 +35,12 @@ export class Game {
     this.player = new Player();
     this.hud = new Hud();
     this.enemies = new EnemyManager(this.scene, {
-      onPlayerHit: (dmg, enemy) => this._onPlayerHit(dmg, enemy),
+      onProjectile: (enemy) => this._spawnIncoming(enemy),
       onScore: (pts) => this._addScore(pts),
     });
+
+    // Live in-flight enemy shots heading toward the player.
+    this.incoming = [];
 
     this.input = new InputManager(canvas, {
       onFire: (x, y) => this._fire(x, y),
@@ -65,6 +68,14 @@ export class Game {
 
     this.hud.onStart(() => this.start());
     window.addEventListener("resize", () => this.engine.resize());
+    window.addEventListener("orientationchange", () =>
+      setTimeout(() => this.engine.resize(), 150)
+    );
+    // Mobile browsers shrink/grow the visible area as the URL bar hides; keep
+    // the render buffer in sync with the actual visible viewport.
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", () => this.engine.resize());
+    }
 
     this.engine.runRenderLoop(() => this._frame());
   }
@@ -110,8 +121,10 @@ export class Game {
   // Lifecycle
   // -------------------------------------------------------------------------
   start() {
+    this._goFullscreen();
     this.hud.hideOverlay();
     this.hud.showGame(true);
+    this._clearIncoming();
     this.player.reset();
     this.score = 0;
     this.locIndex = 0;
@@ -197,6 +210,7 @@ export class Game {
   _nextLocation() {
     this.state = State.TRANSITION;
     this.enemies.clear();
+    this._clearIncoming();
     const next = this.locIndex + 1;
     this.hud.fade(async () => {
       this.locIndex = next;
@@ -211,6 +225,7 @@ export class Game {
     this.state = State.WIN;
     this.input.setEnabled(false);
     this.enemies.clear();
+    this._clearIncoming();
     this.hud.showGame(false);
     this.hud.showOverlay(
       "MISSION CLEAR",
@@ -223,6 +238,7 @@ export class Game {
     this.state = State.GAMEOVER;
     this.input.setEnabled(false);
     this.enemies.clear();
+    this._clearIncoming();
     this.hud.setDucking(false);
     this.hud.showGame(false);
     this.hud.showOverlay(
@@ -247,7 +263,29 @@ export class Game {
     this.hud.fireKick();
 
     const rect = this.canvas.getBoundingClientRect();
-    const pick = this.scene.pick(clientX - rect.left, clientY - rect.top);
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const pick = this.scene.pick(x, y);
+
+    // Work out where the shot lands so we can draw a visible tracer + spark.
+    const cam = this.camera;
+    const fwd = cam.getDirection(B.Axis.Z);
+    const right = cam.getDirection(B.Axis.X);
+    const muzzle = cam.position
+      .add(fwd.scale(0.6))
+      .add(right.scale(0.22))
+      .add(new B.Vector3(0, -0.28, 0));
+
+    let end;
+    if (pick && pick.hit && pick.pickedPoint) {
+      end = pick.pickedPoint;
+    } else {
+      const ray = this.scene.createPickingRay(x, y, B.Matrix.Identity(), cam);
+      end = ray.origin.add(ray.direction.scale(80));
+    }
+    this._spawnTracer(muzzle, end);
+    if (pick && pick.hit) this._spawnImpact(end);
+
     if (pick && pick.hit && pick.pickedMesh) {
       const enemy = pick.pickedMesh.metadata && pick.pickedMesh.metadata.enemy;
       if (enemy) enemy.kill(true);
@@ -281,6 +319,120 @@ export class Game {
     this.hud.setScore(this.score);
   }
 
+  // Ask the browser for real fullscreen + landscape. Best-effort: iOS Safari on
+  // iPhone supports neither, so failures are swallowed.
+  _goFullscreen() {
+    const el = document.documentElement;
+    const req =
+      el.requestFullscreen ||
+      el.webkitRequestFullscreen ||
+      el.msRequestFullscreen;
+    if (req) {
+      try {
+        const p = req.call(el);
+        if (p && p.catch) p.catch(() => {});
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock("landscape").catch(() => {});
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Projectiles & shot effects
+  // -------------------------------------------------------------------------
+
+  // An enemy fired: launch a bright, visible round toward the player's standing
+  // eye line. Ducking drops the camera below that line, so the shot sails over.
+  _spawnIncoming(enemy) {
+    if (!this.player.alive) return;
+    const scene = this.scene;
+    const mesh = B.MeshBuilder.CreateSphere("shot", { diameter: 0.28, segments: 8 }, scene);
+    const mat = new B.StandardMaterial("shotMat", scene);
+    mat.emissiveColor = new B.Color3(1, 0.75, 0.1);
+    mat.diffuseColor = new B.Color3(1, 0.6, 0);
+    mat.disableLighting = true;
+    mesh.material = mat;
+    mesh.isPickable = false;
+
+    const start = enemy.muzzleWorld().clone();
+    // Aim at the standing eye position (not the ducked camera) with slight spread.
+    const target = new B.Vector3(
+      this.camPos.x + (Math.sin(performance.now() * 0.013) * 0.5),
+      this.camPos.y,
+      this.camPos.z
+    );
+    mesh.position.copyFrom(start);
+
+    this.incoming.push({ mesh, start, target, t: 0 });
+  }
+
+  _clearIncoming() {
+    for (const p of this.incoming) p.mesh.dispose();
+    this.incoming = [];
+  }
+
+  _updateIncoming(dt) {
+    const speed = 1 / CONFIG.enemy.shotTravel;
+    for (const p of this.incoming) {
+      p.t += dt * speed;
+      const k = Math.min(1, p.t);
+      B.Vector3.LerpToRef(p.start, p.target, k, p.mesh.position);
+      // Grow as it approaches so it reads as "incoming" without engulfing the view.
+      const s = 0.5 + k * 1.1;
+      p.mesh.scaling.set(s, s, s);
+      if (p.t >= 1) {
+        // Impact: the player is hit only if standing (not ducked under the line).
+        if (!this.player.ducking) this._onPlayerHit(CONFIG.enemy.damage);
+        p.mesh.dispose();
+        p.done = true;
+      }
+    }
+    this.incoming = this.incoming.filter((p) => !p.done);
+  }
+
+  // A short-lived bright streak from the muzzle to the hit point.
+  _spawnTracer(start, end) {
+    const dir = end.subtract(start);
+    const dist = dir.length();
+    if (dist < 0.01) return;
+    const cyl = B.MeshBuilder.CreateCylinder(
+      "tracer",
+      { height: dist, diameter: 0.09, tessellation: 6 },
+      this.scene
+    );
+    const mat = new B.StandardMaterial("tracerMat", this.scene);
+    mat.emissiveColor = new B.Color3(1, 1, 0.8);
+    mat.disableLighting = true;
+    cyl.material = mat;
+    cyl.isPickable = false;
+    cyl.position.copyFrom(start.add(end).scale(0.5));
+
+    const up = B.Axis.Y;
+    const ndir = dir.normalize();
+    const axis = B.Vector3.Cross(up, ndir);
+    if (axis.lengthSquared() > 1e-6) {
+      axis.normalize();
+      const angle = Math.acos(Math.min(1, Math.max(-1, B.Vector3.Dot(up, ndir))));
+      cyl.rotationQuaternion = B.Quaternion.RotationAxis(axis, angle);
+    }
+    setTimeout(() => cyl.dispose(), 100);
+  }
+
+  // A spark where a shot lands.
+  _spawnImpact(point) {
+    const s = B.MeshBuilder.CreateSphere("impact", { diameter: 0.6, segments: 6 }, this.scene);
+    const mat = new B.StandardMaterial("impactMat", this.scene);
+    mat.emissiveColor = new B.Color3(1, 0.9, 0.5);
+    mat.disableLighting = true;
+    s.material = mat;
+    s.isPickable = false;
+    s.position.copyFrom(point);
+    setTimeout(() => s.dispose(), 160);
+  }
+
   // -------------------------------------------------------------------------
   // Frame update
   // -------------------------------------------------------------------------
@@ -303,7 +455,9 @@ export class Game {
       this._updateTravel(dt);
     } else if (this.state === State.COMBAT) {
       this.enemies.update(dt);
-      if (this.enemies.resolved) {
+      this._updateIncoming(dt);
+      // Advance only once enemies are clear AND no shots are still in the air.
+      if (this.enemies.resolved && this.incoming.length === 0) {
         this.clearTimer += dt;
         if (this.clearTimer > 0.8) this._advance();
       } else {

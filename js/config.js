@@ -16,9 +16,10 @@ export const CONFIG = {
 
   enemy: {
     riseTime: 0.5, // seconds to emerge from cover
-    aimTime: 1.3, // telegraph time before firing
+    aimTime: 1.4, // telegraph time before firing
     damage: 1,
     hitFlashTime: 0.25,
+    shotTravel: 0.7, // seconds for an incoming shot to reach you (dodge window)
   },
 
   combat: {
@@ -29,6 +30,6 @@ export const CONFIG = {
   camera: {
     travelTime: 2.2, // seconds to slide between waypoints
     fov: 0.9,
-    duckDrop: 1.4, // how far the view drops when ducking, world units
+    duckDrop: 2.0, // how far the view drops when ducking, world units
   },
 };
