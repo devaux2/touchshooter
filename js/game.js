@@ -4,7 +4,7 @@ import { EnemyManager } from "./enemies.js";
 import { InputManager } from "./input.js";
 import { Hud } from "./hud.js";
 import { PowerupManager } from "./powerups.js";
-import { LOCATIONS, buildLocation } from "./levels.js";
+import { getLocations, buildLocation } from "./levels.js";
 
 const B = window.BABYLON;
 
@@ -63,6 +63,7 @@ export class Game {
     });
 
     this.state = State.MENU;
+    this.locations = getLocations(); // built-in levels, or an editor override
     this.score = 0;
     this.locIndex = 0;
     this.stageIndex = 0;
@@ -139,6 +140,7 @@ export class Game {
       document.activeElement.blur();
     }
     this._goFullscreen();
+    this.locations = getLocations(); // pick up a freshly-saved editor level
     this.hud.hideOverlay();
     this.hud.showGame(true);
     this._clearIncoming();
@@ -163,7 +165,7 @@ export class Game {
       this.locationRoot.dispose(false, true);
       this.locationRoot = null;
     }
-    const loc = LOCATIONS[index];
+    const loc = this.locations[index];
     this.location = loc;
 
     const built = buildLocation(this.scene, loc);
@@ -221,7 +223,7 @@ export class Game {
     const stages = this.location.stages;
     if (this.stageIndex + 1 < stages.length) {
       this._goToStage(this.stageIndex + 1);
-    } else if (this.locIndex + 1 < LOCATIONS.length) {
+    } else if (this.locIndex + 1 < this.locations.length) {
       this._nextLocation();
     } else {
       this._win();

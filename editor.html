@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rail Strike — Map Editor</title>
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <link rel="stylesheet" href="css/editor.css" />
+</head>
+<body>
+  <div id="topbar">
+    <span class="brand">MAP EDITOR</span>
+
+    <label>Location
+      <select id="locSelect"></select>
+    </label>
+    <button id="addLoc">+ Loc</button>
+    <button id="delLoc">– Loc</button>
+    <input id="locName" type="text" placeholder="Location name" />
+
+    <span class="spacer"></span>
+
+    <button id="view2d" class="viewBtn active">Top-down</button>
+    <button id="view3d" class="viewBtn">3D</button>
+
+    <span class="spacer"></span>
+
+    <button id="savePlay" class="primary">Save &amp; Play ▶</button>
+    <button id="export">Export</button>
+    <button id="import">Import</button>
+    <button id="loadBuiltin">Load built-in</button>
+    <button id="clearSaved">Clear saved</button>
+    <input id="importFile" type="file" accept="application/json" hidden />
+  </div>
+
+  <div id="main">
+    <!-- Tool palette -->
+    <div id="tools">
+      <button class="tool active" data-tool="select" title="Select / move / pan">▶ Select</button>
+      <button class="tool" data-tool="enemy" title="Place an enemy spawn">＋ Enemy</button>
+      <button class="tool" data-tool="cover" title="Place low cover">＋ Cover</button>
+      <button class="tool" data-tool="waypoint" title="Add a rail waypoint (camera stop)">＋ Waypoint</button>
+      <button class="tool" data-tool="look" title="Set the active stage's aim direction">◎ Look</button>
+      <hr />
+      <button id="deleteBtn" title="Delete selected (Del)">🗑 Delete</button>
+      <hr />
+      <div class="hint">
+        Left-drag empty space to pan · wheel to zoom · right-drag to orbit (3D).
+      </div>
+    </div>
+
+    <canvas id="editorCanvas" touch-action="none"></canvas>
+
+    <!-- Properties -->
+    <div id="panel">
+      <section>
+        <h3>Stages (rail)</h3>
+        <select id="stageSelect" size="5"></select>
+        <div class="row">
+          <button id="stageUp">↑</button>
+          <button id="stageDown">↓</button>
+          <button id="delStage">Delete stage</button>
+        </div>
+      </section>
+
+      <section id="selProps">
+        <h3>Selection</h3>
+        <div id="selBody" class="muted">Nothing selected.</div>
+      </section>
+
+      <section>
+        <h3>Theme</h3>
+        <div id="themeBody"></div>
+      </section>
+    </div>
+  </div>
+
+  <div id="status"></div>
+
+  <script type="module" src="js/editor/editor.js"></script>
+</body>
+</html>

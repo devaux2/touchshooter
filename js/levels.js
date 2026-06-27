@@ -196,6 +196,28 @@ export const LOCATIONS = [
   },
 ];
 
+// localStorage key the map editor writes to. When present, the game plays the
+// editor's levels instead of the built-in ones — but only in that browser, so
+// the editor stays a private iteration tool (it isn't linked from the menu).
+export const LEVELS_KEY = "touchshooter.levels";
+
+// The levels the game should play: an editor override if one exists in this
+// browser, otherwise the built-in LOCATIONS. Falls back safely on bad data.
+export function getLocations() {
+  try {
+    const raw = localStorage.getItem(LEVELS_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (Array.isArray(data) && data.length && data.every((l) => l && l.stages)) {
+        return data;
+      }
+    }
+  } catch (e) {
+    /* ignore malformed override */
+  }
+  return LOCATIONS;
+}
+
 // Build a location's static geometry under one node (disposed when leaving).
 export function buildLocation(scene, loc) {
   const root = new B.TransformNode("location:" + loc.name, scene);

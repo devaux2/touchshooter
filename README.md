@@ -61,6 +61,31 @@ python3 -m http.server 8080
 
 Play in **landscape**; on a phone you'll be prompted to rotate.
 
+## Map editor
+
+`editor.html` is a standalone, browser-based level editor (not linked from the
+game menu, so it stays a private iteration tool). Open it directly:
+
+```
+http://localhost:8080/editor.html
+```
+
+- **Top-down and 3D views** — toggle in the top bar. Left-drag to pan, wheel to
+  zoom, right-drag to orbit in 3D.
+- **Tools** — place **enemies**, **cover** props, and **rail waypoints** (camera
+  stops); the **Look** tool aims the active stage. Select to move/drag, with a
+  properties panel for exact values.
+- **Stages = the rail** — each waypoint is a camera stop; they connect in order
+  into the green rail path. Enemies/cover belong to the active stage.
+- **Save & Play** writes the level to your browser's `localStorage`; the game
+  then plays *your* level instead of the built-in ones — but only in your
+  browser, so it never affects other players until you commit it.
+- **Export** downloads `levels.json`; **Import** loads one back. To ship a level
+  for everyone, paste the exported array into `js/levels.js` (`LOCATIONS`).
+
+The editor reads and writes the exact level format the game consumes, so there's
+no conversion step.
+
 ## Project layout
 
 ```

@@ -1,0 +1,206 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  background: #11151b;
+  color: #e8e8e3;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+}
+
+button,
+select,
+input {
+  font-family: inherit;
+  font-size: 13px;
+  color: #e8e8e3;
+  background: #232a33;
+  border: 1px solid #39434f;
+  border-radius: 4px;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #2d3744;
+}
+
+button.active,
+.viewBtn.active {
+  background: #3a6ea5;
+  border-color: #4f8bc9;
+}
+
+button.primary {
+  background: #c44; /* save & play */
+  border-color: #e66;
+}
+
+button.primary:hover {
+  background: #d55;
+}
+
+input[type="text"],
+input[type="number"],
+select {
+  cursor: text;
+}
+
+/* ---------- Top bar ---------- */
+#topbar {
+  height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  background: #1a212a;
+  border-bottom: 1px solid #39434f;
+}
+
+#topbar .brand {
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: #ff7a3c;
+  margin-right: 8px;
+}
+
+#topbar label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #9fb0c0;
+}
+
+#topbar .spacer {
+  flex: 1;
+}
+
+#locName {
+  width: 150px;
+}
+
+/* ---------- Layout ---------- */
+#main {
+  position: absolute;
+  top: 46px;
+  bottom: 22px;
+  left: 0;
+  right: 0;
+  display: flex;
+}
+
+#tools {
+  width: 150px;
+  padding: 10px;
+  background: #1a212a;
+  border-right: 1px solid #39434f;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#tools hr {
+  border: none;
+  border-top: 1px solid #39434f;
+  margin: 4px 0;
+}
+
+#tools .hint {
+  font-size: 11px;
+  color: #7d8a98;
+  line-height: 1.5;
+  margin-top: auto;
+}
+
+#editorCanvas {
+  flex: 1;
+  display: block;
+  outline: none;
+  background: #0d1117;
+}
+
+#panel {
+  width: 270px;
+  padding: 12px;
+  background: #1a212a;
+  border-left: 1px solid #39434f;
+  overflow-y: auto;
+}
+
+#panel section {
+  margin-bottom: 18px;
+}
+
+#panel h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #9fb0c0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #39434f;
+  padding-bottom: 4px;
+}
+
+#stageSelect {
+  width: 100%;
+  height: 96px;
+}
+
+.row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.field label {
+  color: #9fb0c0;
+  flex: 1;
+}
+
+.field input,
+.field select {
+  width: 110px;
+}
+
+.field input[type="color"] {
+  width: 40px;
+  padding: 2px;
+  height: 26px;
+}
+
+.field input[type="range"] {
+  width: 110px;
+}
+
+.muted {
+  color: #7d8a98;
+}
+
+#status {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 22px;
+  line-height: 22px;
+  padding: 0 12px;
+  font-size: 12px;
+  color: #9fb0c0;
+  background: #0d1117;
+  border-top: 1px solid #39434f;
+}
