@@ -1,0 +1,289 @@
+:root {
+  --accent: #ff5a3c;
+  --accent-dim: #b53524;
+  --good: #4cd07d;
+  --ink: #f4f4f0;
+  --shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: var(--ink);
+  font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  touch-action: none;
+}
+
+#renderCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---------- HUD ---------- */
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+#topbar {
+  position: absolute;
+  top: 16px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 22px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+#location {
+  text-transform: uppercase;
+  font-size: 18px;
+  text-shadow: var(--shadow);
+}
+
+#score {
+  font-size: 22px;
+  color: var(--accent);
+  text-shadow: var(--shadow);
+  font-variant-numeric: tabular-nums;
+}
+
+#health {
+  position: absolute;
+  top: 48px;
+  left: 22px;
+  display: flex;
+  gap: 6px;
+}
+
+.heart {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--accent);
+  box-shadow: var(--shadow);
+  transition: transform 0.15s, background 0.2s, opacity 0.2s;
+}
+
+.heart.empty {
+  background: #333;
+  opacity: 0.5;
+  transform: scale(0.85);
+}
+
+#ammo {
+  position: absolute;
+  bottom: 22px;
+  right: 26px;
+  font-weight: bold;
+  text-shadow: var(--shadow);
+  font-variant-numeric: tabular-nums;
+}
+
+#ammoCount {
+  font-size: 40px;
+  color: var(--ink);
+}
+
+#ammoMax {
+  font-size: 22px;
+  opacity: 0.7;
+}
+
+#ammo.low #ammoCount {
+  color: var(--accent);
+}
+
+#reloadHint {
+  position: absolute;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  letter-spacing: 2px;
+  opacity: 0.55;
+  text-shadow: var(--shadow);
+  transition: opacity 0.3s;
+}
+
+#reloadHint.fade {
+  opacity: 0;
+}
+
+/* Duck / reload state tint */
+#hud.ducking::after {
+  content: "RELOADING…";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 90px;
+  font-size: 20px;
+  letter-spacing: 4px;
+  color: var(--good);
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.55),
+    rgba(0, 0, 0, 0) 45%
+  );
+}
+
+/* ---------- Crosshair ---------- */
+#crosshair {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  z-index: 9;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+#crosshair::before,
+#crosshair::after {
+  content: "";
+  position: absolute;
+  background: var(--accent);
+}
+
+#crosshair::before {
+  left: 50%;
+  top: -8px;
+  bottom: -8px;
+  width: 2px;
+  margin-left: -1px;
+}
+
+#crosshair::after {
+  top: 50%;
+  left: -8px;
+  right: -8px;
+  height: 2px;
+  margin-top: -1px;
+}
+
+#crosshair.fire {
+  animation: kick 0.12s ease-out;
+}
+
+@keyframes kick {
+  0% {
+    transform: scale(0.7);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ---------- Fade / overlay ---------- */
+#fade {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  z-index: 20;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+#fade.on {
+  opacity: 1;
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 40%, #1a2a3a, #060a10);
+}
+
+#overlayPanel {
+  text-align: center;
+  padding: 30px;
+  max-width: 520px;
+}
+
+#overlayTitle {
+  font-size: 52px;
+  letter-spacing: 6px;
+  color: var(--accent);
+  text-shadow: 0 4px 0 var(--accent-dim), 0 6px 14px rgba(0, 0, 0, 0.6);
+  margin-bottom: 18px;
+}
+
+#overlayText {
+  font-size: 17px;
+  line-height: 1.7;
+  opacity: 0.85;
+  margin-bottom: 30px;
+}
+
+#startButton {
+  font-family: inherit;
+  font-size: 22px;
+  font-weight: bold;
+  letter-spacing: 3px;
+  color: var(--ink);
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 14px 46px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--accent-dim);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+
+#startButton:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--accent-dim);
+}
+
+/* ---------- Rotate notice ---------- */
+#rotateNotice {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: #060a10;
+  font-size: 22px;
+  letter-spacing: 2px;
+  text-align: center;
+}
+
+#rotateNotice.show {
+  display: flex;
+}

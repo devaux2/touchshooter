@@ -1,0 +1,110 @@
+// Thin wrapper over the DOM overlay. The game pushes state in; no game logic
+// lives here. Keeping it DOM-based avoids pulling in Babylon's GUI package, so
+// Babylon core stays the only dependency.
+export class Hud {
+  constructor() {
+    this.el = {
+      hud: document.getElementById("hud"),
+      location: document.getElementById("location"),
+      score: document.getElementById("score"),
+      health: document.getElementById("health"),
+      ammo: document.getElementById("ammo"),
+      ammoCount: document.getElementById("ammoCount"),
+      ammoMax: document.getElementById("ammoMax"),
+      crosshair: document.getElementById("crosshair"),
+      reloadHint: document.getElementById("reloadHint"),
+      fade: document.getElementById("fade"),
+      overlay: document.getElementById("overlay"),
+      overlayTitle: document.getElementById("overlayTitle"),
+      overlayText: document.getElementById("overlayText"),
+      startButton: document.getElementById("startButton"),
+      rotateNotice: document.getElementById("rotateNotice"),
+    };
+    this._builtHealth = -1;
+  }
+
+  showGame(show) {
+    this.el.hud.classList.toggle("hidden", !show);
+    this.el.crosshair.classList.toggle("hidden", !show);
+  }
+
+  setLocation(name) {
+    this.el.location.textContent = name;
+  }
+
+  setScore(score) {
+    this.el.score.textContent = String(score).padStart(5, "0");
+  }
+
+  setHealth(health, max) {
+    if (this._builtHealth !== max) {
+      this.el.health.innerHTML = "";
+      this._hearts = [];
+      for (let i = 0; i < max; i++) {
+        const h = document.createElement("div");
+        h.className = "heart";
+        this.el.health.appendChild(h);
+        this._hearts.push(h);
+      }
+      this._builtHealth = max;
+    }
+    this._hearts.forEach((h, i) => h.classList.toggle("empty", i >= health));
+  }
+
+  setAmmo(ammo, max) {
+    this.el.ammoCount.textContent = ammo;
+    this.el.ammoMax.textContent = "/" + max;
+    this.el.ammo.classList.toggle("low", ammo <= 2);
+  }
+
+  setDucking(on) {
+    this.el.hud.classList.toggle("ducking", on);
+  }
+
+  aim(x, y) {
+    this.el.crosshair.style.left = x + "px";
+    this.el.crosshair.style.top = y + "px";
+  }
+
+  fireKick() {
+    const c = this.el.crosshair;
+    c.classList.remove("fire");
+    // Force reflow so the animation restarts on rapid fire.
+    void c.offsetWidth;
+    c.classList.add("fire");
+  }
+
+  hideReloadHint() {
+    this.el.reloadHint.classList.add("fade");
+  }
+
+  // Fade to black, run `mid` at full black, then fade back. Returns a promise.
+  fade(mid, holdMs = 250) {
+    return new Promise((resolve) => {
+      const f = this.el.fade;
+      f.classList.add("on");
+      setTimeout(async () => {
+        if (mid) await mid();
+        setTimeout(() => {
+          f.classList.remove("on");
+          setTimeout(resolve, 500);
+        }, holdMs);
+      }, 520);
+    });
+  }
+
+  showOverlay(title, html, buttonLabel = "START") {
+    this.el.overlayTitle.textContent = title;
+    this.el.overlayText.innerHTML = html;
+    this.el.startButton.textContent = buttonLabel;
+    this.el.overlay.classList.remove("hidden");
+  }
+
+  hideOverlay() {
+    this.el.overlay.classList.add("hidden");
+  }
+
+  onStart(fn) {
+    this.el.startButton.addEventListener("click", fn);
+  }
+}

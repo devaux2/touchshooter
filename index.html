@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+  />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Rail Strike</title>
+
+  <!-- Babylon.js is the project's only runtime dependency, loaded from the CDN. -->
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <canvas id="renderCanvas" touch-action="none"></canvas>
+
+  <!-- Heads-up display, drawn as a DOM overlay above the canvas. -->
+  <div id="hud" class="hidden">
+    <div id="topbar">
+      <div id="location">—</div>
+      <div id="score">0</div>
+    </div>
+
+    <div id="health"></div>
+
+    <div id="ammo">
+      <span id="ammoCount">0</span><span id="ammoMax">/0</span>
+    </div>
+
+    <div id="reloadHint">DOUBLE-TAP &amp; HOLD TO DUCK / RELOAD</div>
+  </div>
+
+  <!-- Floating aim crosshair that tracks the pointer. -->
+  <div id="crosshair" class="hidden"></div>
+
+  <!-- Full-screen panels for menu / win / lose, plus the fade overlay. -->
+  <div id="fade"></div>
+
+  <div id="overlay">
+    <div id="overlayPanel">
+      <h1 id="overlayTitle">RAIL STRIKE</h1>
+      <p id="overlayText">
+        A landscape light-gun shooter.<br />
+        Tap to shoot. Double-tap &amp; hold to duck and reload.
+      </p>
+      <button id="startButton">START</button>
+    </div>
+  </div>
+
+  <div id="rotateNotice">
+    <div>↻ Rotate your device to landscape</div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
