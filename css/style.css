@@ -170,6 +170,88 @@ body {
   transform: scale(0.8);
 }
 
+/* Weapon name, sits just above the magazine on the right. */
+#weapon {
+  position: absolute;
+  right: 14px;
+  bottom: calc(50% + 130px);
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  text-align: right;
+  color: var(--ink);
+  text-shadow: var(--shadow);
+}
+
+/* Active effect banner, top-centre. */
+#effectBanner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 16px;
+  font-weight: bold;
+  letter-spacing: 3px;
+  text-shadow: var(--shadow);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Powerup pickup toast, centred, briefly flashes then fades. */
+#pickupToast {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.6);
+  font-size: 34px;
+  font-weight: bold;
+  letter-spacing: 4px;
+  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.7);
+  opacity: 0;
+  pointer-events: none;
+}
+
+#pickupToast.show {
+  animation: toast 1.2s ease-out forwards;
+}
+
+@keyframes toast {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -65%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -80%) scale(1);
+  }
+}
+
+/* Time-slow blue wash. */
+#slowTint {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(40, 130, 220, 0) 40%,
+    rgba(40, 130, 220, 0.28) 100%
+  );
+}
+
+#slowTint.on {
+  opacity: 1;
+}
+
 #reloadHint {
   position: absolute;
   bottom: 26px;

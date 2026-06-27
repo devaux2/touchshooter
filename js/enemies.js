@@ -113,6 +113,18 @@ class Enemy {
 
   update(dt) {
     const e = CONFIG.enemy;
+
+    // Anti-gravity powerup: drift helplessly upward, no aiming, no firing.
+    if (
+      this.manager.antigrav &&
+      this.state !== State.DYING &&
+      this.state !== State.DONE
+    ) {
+      this.root.position.y += CONFIG.effects.antigravRise * dt;
+      this.root.rotation.z = Math.sin(this.root.position.y * 0.7) * 0.35;
+      return;
+    }
+
     this.t += dt;
 
     switch (this.state) {
@@ -203,6 +215,23 @@ class Enemy {
     return this.state === State.DYING || this.state === State.DONE;
   }
 
+  // Approximate body-centre in world space, for area/line powerup queries.
+  center() {
+    const p = this.root.getAbsolutePosition();
+    return new B.Vector3(p.x, p.y + 1.1, p.z);
+  }
+
+  // Drop back into cover (used when the anti-gravity effect ends).
+  returnToCover() {
+    if (this.killed) return;
+    this.root.position.set(this.spec.position.x, this.hiddenY, this.spec.position.z);
+    this.root.rotation.set(0, 0, 0);
+    this.state = State.HIDING;
+    this.t = 0;
+    this.hideTime = 0.2 + Math.random() * 0.6;
+    this._resetColor();
+  }
+
   dispose() {
     if (this._disposed) return;
     this._disposed = true;
@@ -212,14 +241,16 @@ class Enemy {
 
 // Owns the live set of enemies and drives a per-waypoint spawn schedule.
 export class EnemyManager {
-  constructor(scene, { onProjectile, onScore }) {
+  constructor(scene, { onProjectile, onScore, onKill }) {
     this.scene = scene;
     this.onProjectile = onProjectile;
     this.onScore = onScore;
+    this.onKillCb = onKill;
     this.enemies = [];
     this.pending = []; // queued spawns: { delay, spec }
     this.waveElapsed = 0;
     this.spawnedAll = false;
+    this.antigrav = false; // anti-gravity powerup active
   }
 
   // Begin a wave from a list of spawn descriptors with individual delays.
@@ -262,6 +293,7 @@ export class EnemyManager {
     let points = CONFIG.combat.pointsPerKill;
     if (quick) points += CONFIG.combat.accuracyBonus;
     if (this.onScore) this.onScore(points, enemy);
+    if (this.onKillCb) this.onKillCb(enemy);
   }
 
   // The wave is over once every queued enemy has spawned and resolved.
@@ -275,5 +307,41 @@ export class EnemyManager {
     let live = 0;
     for (const e of this.enemies) if (!e.killed) live++;
     return this.pending.length + live;
+  }
+
+  // ----- Powerup support -----
+
+  get liveEnemies() {
+    return this.enemies.filter((e) => !e.killed);
+  }
+
+  startAntigrav() {
+    this.antigrav = true;
+  }
+
+  stopAntigrav() {
+    this.antigrav = false;
+    for (const e of this.enemies) e.returnToCover();
+  }
+
+  // Kill every live enemy (meteor strike). No quick-kill bonus.
+  killAll() {
+    for (const e of this.liveEnemies) e.kill(false);
+  }
+
+  // Live enemies within `r` of a world point (rocket / plasma splash).
+  enemiesInRadius(point, r) {
+    return this.liveEnemies.filter((e) => B.Vector3.Distance(e.center(), point) <= r);
+  }
+
+  // Live enemies whose centre lies within `radius` of a forward ray (rail gun).
+  enemiesAlongRay(origin, dir, radius) {
+    return this.liveEnemies.filter((e) => {
+      const toC = e.center().subtract(origin);
+      const proj = B.Vector3.Dot(toC, dir);
+      if (proj <= 0) return false;
+      const closest = origin.add(dir.scale(proj));
+      return B.Vector3.Distance(closest, e.center()) <= radius;
+    });
   }
 }

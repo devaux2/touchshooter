@@ -22,8 +22,13 @@ export class InputManager {
 
     this.enabled = false;
     this.lastTapTime = -Infinity;
-    this.lastFireTime = -Infinity;
     this.activePointerId = null;
+
+    // Fire-held tracking, so auto-fire weapons can keep shooting while held.
+    this.firing = false;
+    this.firePointerId = null;
+    this.fireX = 0;
+    this.fireY = 0;
 
     // Duck sources, combined in _refreshDuck().
     this.touchDuck = false;
@@ -51,6 +56,8 @@ export class InputManager {
   setEnabled(on) {
     this.enabled = on;
     if (!on) {
+      this.firing = false;
+      this.firePointerId = null;
       this.touchDuck = false;
       this.keyDuck = false;
       this._refreshDuck();
@@ -97,19 +104,30 @@ export class InputManager {
       }
     }
 
-    if (now - this.lastFireTime >= CONFIG.input.fireCooldown) {
-      this.lastFireTime = now;
-      if (this.onFire) this.onFire(e.clientX, e.clientY);
-    }
+    // Begin firing; auto-fire weapons repeat from the game loop while held. The
+    // per-weapon fire-rate is enforced by the Game, not here.
+    this.firing = true;
+    this.firePointerId = e.pointerId;
+    this.fireX = e.clientX;
+    this.fireY = e.clientY;
+    if (this.onFire) this.onFire(e.clientX, e.clientY);
   }
 
   _move(e) {
     if (!this.enabled) return;
     if (this.onAim) this.onAim(e.clientX, e.clientY);
+    if (this.firing && e.pointerId === this.firePointerId) {
+      this.fireX = e.clientX;
+      this.fireY = e.clientY;
+    }
   }
 
   _up(e) {
     if (!this.enabled) return;
+    if (e.pointerId === this.firePointerId) {
+      this.firing = false;
+      this.firePointerId = null;
+    }
     if (this.touchDuck && e.pointerId === this.activePointerId) {
       this.touchDuck = false;
       this.activePointerId = null;

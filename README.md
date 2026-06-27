@@ -29,6 +29,25 @@ the quick second press-and-hold is what drops you into cover.
   Docks** and **Ruined Plaza**.
 - Take five hits and you're down. Duck at the right moment to avoid fire entirely.
 
+## Powerups
+
+**Weapons** are dropped by enemies (a per-wave chance) and **auto-equip** the
+instant they drop. Each has its own fixed ammo and reverts to your pistol once
+spent (Time Crisis style):
+
+- **Machine gun** — rapid auto-fire (hold to spray)
+- **Rocket launcher** — explosive splash damage
+- **Plasma grenades** — a larger plasma blast
+- **Lightning** — hits a target and chains to nearby enemies
+- **Rail gun** — a piercing beam that kills everything in line
+
+**Bubbles** drift across the lane and trigger an effect when you **shoot/tap**
+them:
+
+- **Anti-gravity** — all enemies float helplessly upward for a few seconds
+- **Time slow** — enemies and their shots slow down; you fire and reload at full speed
+- **Meteor strike** — a fireball drops and wipes out every enemy on screen
+
 ## Running it
 
 No tooling required — it is a static site. Because it uses ES modules, serve the

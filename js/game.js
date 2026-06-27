@@ -3,6 +3,7 @@ import { Player } from "./player.js";
 import { EnemyManager } from "./enemies.js";
 import { InputManager } from "./input.js";
 import { Hud } from "./hud.js";
+import { PowerupManager } from "./powerups.js";
 import { LOCATIONS, buildLocation } from "./levels.js";
 
 const B = window.BABYLON;
@@ -37,10 +38,22 @@ export class Game {
     this.enemies = new EnemyManager(this.scene, {
       onProjectile: (enemy) => this._spawnIncoming(enemy),
       onScore: (pts) => this._addScore(pts),
+      onKill: (enemy) => this._onEnemyKilled(enemy),
+    });
+
+    this.powerups = new PowerupManager(this.scene, {
+      onActivateEffect: (key) => this._activateEffect(key),
     });
 
     // Live in-flight enemy shots heading toward the player.
     this.incoming = [];
+
+    // Timed bubble effects and their state.
+    this.effects = { antigrav: 0, timeslow: 0 };
+    this.timeScale = 1;
+    this.meteor = null;
+    this.lastFireTime = -Infinity;
+    this.weaponDropPending = false;
 
     this.input = new InputManager(canvas, {
       onFire: (x, y) => this._fire(x, y),
@@ -129,6 +142,8 @@ export class Game {
     this.hud.hideOverlay();
     this.hud.showGame(true);
     this._clearIncoming();
+    this.powerups.clear();
+    this._clearEffects();
     this.player.reset();
     this.score = 0;
     this.locIndex = 0;
@@ -196,6 +211,8 @@ export class Game {
       color: e.color || this.location.enemyColor,
     }));
     this.enemies.startWave(specs);
+    // Roll once per wave whether a kill in it will drop a weapon.
+    this.weaponDropPending = Math.random() < CONFIG.powerups.weaponDropChance;
     this.clearTimer = 0;
     this.state = State.COMBAT;
   }
@@ -215,6 +232,8 @@ export class Game {
     this.state = State.TRANSITION;
     this.enemies.clear();
     this._clearIncoming();
+    this.powerups.clear();
+    this._clearEffects();
     const next = this.locIndex + 1;
     this.hud.fade(async () => {
       this.locIndex = next;
@@ -230,6 +249,8 @@ export class Game {
     this.input.setEnabled(false);
     this.enemies.clear();
     this._clearIncoming();
+    this.powerups.clear();
+    this._clearEffects();
     this.hud.showGame(false);
     this.hud.showOverlay(
       "MISSION CLEAR",
@@ -243,6 +264,8 @@ export class Game {
     this.input.setEnabled(false);
     this.enemies.clear();
     this._clearIncoming();
+    this.powerups.clear();
+    this._clearEffects();
     this.hud.setDucking(false);
     this.hud.showGame(false);
     this.hud.showOverlay(
@@ -257,21 +280,34 @@ export class Game {
   // -------------------------------------------------------------------------
   _fire(clientX, clientY) {
     if (this.state !== State.COMBAT) return;
-    if (!this.player.canFire()) {
-      // Out of ammo: nudge the player to reload.
-      if (this.player.empty) this.hud.fireKick();
-      return;
-    }
-    this.player.consumeRound();
-    this.hud.setAmmo(this.player.ammo, this.player.magazine);
-    this.hud.fireKick();
 
     const rect = this.canvas.getBoundingClientRect();
     const x = clientX - rect.left;
     const y = clientY - rect.top;
     const pick = this.scene.pick(x, y);
+    const meta = pick && pick.hit && pick.pickedMesh ? pick.pickedMesh.metadata : null;
 
-    // Work out where the shot lands so we can draw a visible tracer + spark.
+    // Grabbing a floating pickup takes priority and works even with no ammo.
+    if (meta && meta.pickup) {
+      this._spawnImpact(pick.pickedPoint || pick.pickedMesh.getAbsolutePosition());
+      this.powerups.collect(pick.pickedMesh);
+      return;
+    }
+
+    // Per-weapon fire rate.
+    const cd = this.player.isSpecial ? this.player.weaponDef.cooldown : CONFIG.input.fireCooldown;
+    const now = performance.now();
+    if (now - this.lastFireTime < cd) return;
+
+    if (!this.player.canFire()) {
+      if (this.player.empty) this.hud.fireKick();
+      return;
+    }
+    this.lastFireTime = now;
+    this.player.consumeRound();
+    this.hud.fireKick();
+
+    // Muzzle position and where the shot is aimed.
     const cam = this.camera;
     const fwd = cam.getDirection(B.Axis.Z);
     const right = cam.getDirection(B.Axis.X);
@@ -279,20 +315,72 @@ export class Game {
       .add(fwd.scale(0.6))
       .add(right.scale(0.22))
       .add(new B.Vector3(0, -0.28, 0));
+    const ray = this.scene.createPickingRay(x, y, B.Matrix.Identity(), cam);
+    const end =
+      pick && pick.hit && pick.pickedPoint
+        ? pick.pickedPoint
+        : ray.origin.add(ray.direction.scale(80));
+    const hitEnemy = meta && meta.enemy ? meta.enemy : null;
 
-    let end;
-    if (pick && pick.hit && pick.pickedPoint) {
-      end = pick.pickedPoint;
-    } else {
-      const ray = this.scene.createPickingRay(x, y, B.Matrix.Identity(), cam);
-      end = ray.origin.add(ray.direction.scale(80));
-    }
-    this._spawnTracer(muzzle, end);
-    if (pick && pick.hit) this._spawnImpact(end);
+    this._applyWeapon(muzzle, end, ray, hitEnemy, pick && pick.hit);
+  }
 
-    if (pick && pick.hit && pick.pickedMesh) {
-      const enemy = pick.pickedMesh.metadata && pick.pickedMesh.metadata.enemy;
-      if (enemy) enemy.kill(true);
+  // Resolve a shot according to the current weapon.
+  _applyWeapon(muzzle, end, ray, hitEnemy, hitSomething) {
+    const color = this.player.weaponColor;
+    const def = this.player.weaponDef;
+
+    switch (this.player.weapon) {
+      case "rocket":
+      case "plasma": {
+        this._beam(muzzle, end, 0.12, color);
+        this._spawnExplosion(end, def.splash, color);
+        for (const e of this.enemies.enemiesInRadius(end, def.splash)) e.kill(false);
+        break;
+      }
+      case "railgun": {
+        const far = ray.origin.add(ray.direction.scale(95));
+        this._beam(muzzle, far, 0.24, color, 170);
+        for (const e of this.enemies.enemiesAlongRay(ray.origin, ray.direction, def.pierceRadius)) {
+          e.kill(false);
+        }
+        this._spawnImpact(end);
+        break;
+      }
+      case "lightning": {
+        this._beam(muzzle, end, 0.08, color);
+        if (hitEnemy) {
+          hitEnemy.kill(true);
+          const hitSet = new Set([hitEnemy]);
+          let from = hitEnemy.center();
+          for (let i = 0; i < def.chain; i++) {
+            let nearest = null;
+            let nd = Infinity;
+            for (const e of this.enemies.liveEnemies) {
+              if (hitSet.has(e)) continue;
+              const d = B.Vector3.Distance(e.center(), from);
+              if (d <= def.chainRange && d < nd) {
+                nd = d;
+                nearest = e;
+              }
+            }
+            if (!nearest) break;
+            this._beam(from, nearest.center(), 0.06, color, 150);
+            nearest.kill(false);
+            hitSet.add(nearest);
+            from = nearest.center();
+          }
+        } else {
+          this._spawnImpact(end);
+        }
+        break;
+      }
+      default: {
+        // pistol + machine gun: single hitscan round.
+        this._beam(muzzle, end, this.player.weapon === "machinegun" ? 0.07 : 0.09, color);
+        if (hitSomething) this._spawnImpact(end);
+        if (hitEnemy) hitEnemy.kill(true);
+      }
     }
   }
 
@@ -319,7 +407,8 @@ export class Game {
 
   _refreshHud() {
     this.hud.setHealth(this.player.health, this.player.maxHealth);
-    this.hud.setAmmo(this.player.ammo, this.player.magazine);
+    this.hud.setAmmo(this.player.displayAmmo, this.player.displayMax, this.player.weaponColor);
+    this.hud.setWeapon(this.player.weaponName);
     this.hud.setScore(this.score);
     this.hud.setEnemies(0);
   }
@@ -398,18 +487,18 @@ export class Game {
     this.incoming = this.incoming.filter((p) => !p.done);
   }
 
-  // A short-lived bright streak from the muzzle to the hit point.
-  _spawnTracer(start, end) {
+  // A short-lived bright beam between two points (player tracers, rail/chain).
+  _beam(start, end, diameter, colorHex, life = 100) {
     const dir = end.subtract(start);
     const dist = dir.length();
     if (dist < 0.01) return;
     const cyl = B.MeshBuilder.CreateCylinder(
-      "tracer",
-      { height: dist, diameter: 0.09, tessellation: 6 },
+      "beam",
+      { height: dist, diameter, tessellation: 6 },
       this.scene
     );
-    const mat = new B.StandardMaterial("tracerMat", this.scene);
-    mat.emissiveColor = new B.Color3(1, 1, 0.8);
+    const mat = new B.StandardMaterial("beamMat", this.scene);
+    mat.emissiveColor = colorHex ? B.Color3.FromHexString(colorHex) : new B.Color3(1, 1, 0.8);
     mat.disableLighting = true;
     cyl.material = mat;
     cyl.isPickable = false;
@@ -423,7 +512,32 @@ export class Game {
       const angle = Math.acos(Math.min(1, Math.max(-1, B.Vector3.Dot(up, ndir))));
       cyl.rotationQuaternion = B.Quaternion.RotationAxis(axis, angle);
     }
-    setTimeout(() => cyl.dispose(), 100);
+    setTimeout(() => cyl.dispose(), life);
+  }
+
+  // An expanding, fading blast (rocket / plasma / meteor).
+  _spawnExplosion(point, radius, colorHex) {
+    const s = B.MeshBuilder.CreateSphere("boom", { diameter: 1, segments: 10 }, this.scene);
+    const mat = new B.StandardMaterial("boomMat", this.scene);
+    mat.emissiveColor = colorHex ? B.Color3.FromHexString(colorHex) : new B.Color3(1, 0.6, 0.2);
+    mat.alpha = 0.85;
+    mat.disableLighting = true;
+    s.material = mat;
+    s.isPickable = false;
+    s.position.copyFrom(point);
+
+    const start = performance.now();
+    const grow = radius * 2;
+    const obs = this.scene.onBeforeRenderObservable.add(() => {
+      const k = Math.min(1, (performance.now() - start) / 280);
+      const d = 0.5 + k * grow;
+      s.scaling.set(d, d, d);
+      mat.alpha = 0.85 * (1 - k);
+      if (k >= 1) {
+        this.scene.onBeforeRenderObservable.remove(obs);
+        s.dispose();
+      }
+    });
   }
 
   // A spark where a shot lands.
@@ -439,15 +553,139 @@ export class Game {
   }
 
   // -------------------------------------------------------------------------
+  // Powerups & bubble effects
+  // -------------------------------------------------------------------------
+
+  // A kill may drop a weapon (at most one per wave, decided at wave start). The
+  // weapon auto-equips immediately — no need to shoot the drop.
+  _onEnemyKilled(enemy) {
+    if (this.weaponDropPending) {
+      this.weaponDropPending = false;
+      const keys = Object.keys(CONFIG.weapons);
+      const key = keys[Math.floor(Math.random() * keys.length)];
+      this._spawnExplosion(enemy.center(), 1.4, CONFIG.weapons[key].color);
+      this._collectWeapon(key);
+    }
+  }
+
+  _collectWeapon(key) {
+    const def = CONFIG.weapons[key];
+    this.player.giveWeapon(key, def);
+    this.lastFireTime = -Infinity; // fire immediately with the new weapon
+    this.hud.flashPickup(def.name, def.color);
+  }
+
+  _activateEffect(key) {
+    if (key === "antigrav") {
+      this.effects.antigrav = CONFIG.effects.antigravTime;
+      this.enemies.startAntigrav();
+      this.hud.flashPickup("ANTI-GRAVITY", "#9a6bff");
+    } else if (key === "timeslow") {
+      this.effects.timeslow = CONFIG.effects.timeslowTime;
+      this.hud.flashPickup("TIME SLOW", "#4ad0ff");
+    } else if (key === "meteor") {
+      this._meteorStrike();
+      this.hud.flashPickup("METEOR STRIKE", "#ff5a2a");
+    }
+  }
+
+  _meteorStrike() {
+    const cx = this.camLook.x;
+    const cz = this.camLook.z;
+    const mesh = B.MeshBuilder.CreateSphere("meteor", { diameter: 1.8, segments: 10 }, this.scene);
+    const mat = new B.StandardMaterial("meteorMat", this.scene);
+    mat.emissiveColor = new B.Color3(1, 0.5, 0.15);
+    mat.disableLighting = true;
+    mesh.material = mat;
+    mesh.isPickable = false;
+    const from = new B.Vector3(cx, 42, cz + 8);
+    mesh.position.copyFrom(from);
+    this.meteor = { mesh, from, to: new B.Vector3(cx, 1.5, cz + 16), t: 0 };
+  }
+
+  _updateMeteor(dt) {
+    if (!this.meteor) return;
+    const m = this.meteor;
+    m.t += dt / CONFIG.effects.meteorFall;
+    const k = Math.min(1, m.t);
+    B.Vector3.LerpToRef(m.from, m.to, k * k, m.mesh.position); // accelerate downward
+    const sc = 1 + k * 1.5;
+    m.mesh.scaling.set(sc, sc, sc);
+    if (m.t >= 1) {
+      this._spawnExplosion(m.to, 16, "#ff5a2a");
+      this.enemies.killAll();
+      m.mesh.dispose();
+      this.meteor = null;
+    }
+  }
+
+  _updateEffects(dt) {
+    if (this.effects.antigrav > 0) {
+      this.effects.antigrav -= dt;
+      if (this.effects.antigrav <= 0) {
+        this.effects.antigrav = 0;
+        this.enemies.stopAntigrav();
+      }
+    }
+    if (this.effects.timeslow > 0) {
+      this.effects.timeslow -= dt;
+      if (this.effects.timeslow <= 0) this.effects.timeslow = 0;
+    }
+    this.timeScale = this.effects.timeslow > 0 ? CONFIG.effects.timeslowScale : 1;
+
+    // Banner shows the active effect + countdown.
+    let txt = null;
+    let col = null;
+    if (this.effects.antigrav > 0) {
+      txt = "ANTI-GRAV " + Math.ceil(this.effects.antigrav) + "s";
+      col = "#9a6bff";
+    } else if (this.effects.timeslow > 0) {
+      txt = "TIME SLOW " + Math.ceil(this.effects.timeslow) + "s";
+      col = "#4ad0ff";
+    }
+    this.hud.setEffect(txt, col);
+    this.hud.setSlowTint(this.effects.timeslow > 0);
+  }
+
+  _clearEffects() {
+    this.effects.antigrav = 0;
+    this.effects.timeslow = 0;
+    this.timeScale = 1;
+    this.enemies.stopAntigrav();
+    if (this.meteor) {
+      this.meteor.mesh.dispose();
+      this.meteor = null;
+    }
+    this.hud.setEffect(null);
+    this.hud.setSlowTint(false);
+  }
+
+  // -------------------------------------------------------------------------
   // Frame update
   // -------------------------------------------------------------------------
   _frame() {
     const dt = Math.min(0.05, this.engine.getDeltaTime() / 1000);
 
     this.player.update(dt);
-    // Reflect reload completion and remaining enemies on the HUD.
-    this.hud.setAmmo(this.player.ammo, this.player.magazine);
+    // Reflect reload / weapon / remaining-enemy state on the HUD.
+    this.hud.setAmmo(this.player.displayAmmo, this.player.displayMax, this.player.weaponColor);
+    this.hud.setWeapon(this.player.weaponName);
     this.hud.setEnemies(this.enemies.remaining);
+
+    // Floating pickups + timed bubble effects + the meteor.
+    this.powerups.update(dt, this.state === State.COMBAT);
+    this._updateEffects(dt);
+    this._updateMeteor(dt);
+
+    // Hold-to-fire for auto weapons (machine gun).
+    if (
+      this.state === State.COMBAT &&
+      this.input.firing &&
+      this.player.isSpecial &&
+      this.player.weaponDef.auto
+    ) {
+      this._fire(this.input.fireX, this.input.fireY);
+    }
 
     // Animate the duck dip toward its target every frame.
     const duckSpeed = CONFIG.camera.duckDrop / CONFIG.player.duckRiseTime;
@@ -460,8 +698,10 @@ export class Game {
     if (this.state === State.TRAVELING && this.travel) {
       this._updateTravel(dt);
     } else if (this.state === State.COMBAT) {
-      this.enemies.update(dt);
-      this._updateIncoming(dt);
+      // Time-slow scales enemy + projectile time, but not the player.
+      const enemyDt = dt * this.timeScale;
+      this.enemies.update(enemyDt);
+      this._updateIncoming(enemyDt);
       // Advance only once enemies are clear AND no shots are still in the air.
       if (this.enemies.resolved && this.incoming.length === 0) {
         this.clearTimer += dt;

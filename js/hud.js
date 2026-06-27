@@ -10,6 +10,10 @@ export class Hud {
       health: document.getElementById("health"),
       foes: document.getElementById("foes"),
       bullets: document.getElementById("bullets"),
+      weapon: document.getElementById("weapon"),
+      effectBanner: document.getElementById("effectBanner"),
+      slowTint: document.getElementById("slowTint"),
+      pickupToast: document.getElementById("pickupToast"),
       crosshair: document.getElementById("crosshair"),
       reloadHint: document.getElementById("reloadHint"),
       cover: document.getElementById("cover"),
@@ -23,7 +27,10 @@ export class Hud {
     };
     this._builtHealth = -1;
     this._builtMag = -1;
+    this._bulletColor = null;
     this._foeCount = -1;
+    this._weaponName = undefined;
+    this._effectText = undefined;
   }
 
   showGame(show) {
@@ -54,8 +61,9 @@ export class Hud {
     this._hearts.forEach((h, i) => h.classList.toggle("empty", i >= health));
   }
 
-  // Bullet icons: one slot per magazine round; spent rounds dim out.
-  setAmmo(ammo, max) {
+  // Bullet icons: one slot per round; spent rounds dim out. A special weapon
+  // tints the live rounds with its colour.
+  setAmmo(ammo, max, color) {
     if (this._builtMag !== max) {
       this.el.bullets.innerHTML = "";
       this._bullets = [];
@@ -66,8 +74,48 @@ export class Hud {
         this._bullets.push(b);
       }
       this._builtMag = max;
+      this._bulletColor = undefined; // force a recolour
     }
-    this._bullets.forEach((b, i) => b.classList.toggle("spent", i >= ammo));
+    if (this._bulletColor !== color || this._lastAmmo !== ammo) {
+      this._bulletColor = color;
+      this._lastAmmo = ammo;
+      this._bullets.forEach((b, i) => {
+        const spent = i >= ammo;
+        b.classList.toggle("spent", spent);
+        b.style.background = !spent && color ? color : "";
+      });
+    }
+  }
+
+  // Weapon name label (hidden for the default pistol).
+  setWeapon(name) {
+    if (this._weaponName === name) return;
+    this._weaponName = name;
+    this.el.weapon.textContent = name || "";
+    this.el.weapon.classList.toggle("hidden", !name);
+  }
+
+  // Active bubble-effect banner (e.g. "TIME SLOW 7s").
+  setEffect(text, color) {
+    if (this._effectText === text) return;
+    this._effectText = text;
+    this.el.effectBanner.textContent = text || "";
+    this.el.effectBanner.classList.toggle("hidden", !text);
+    if (text && color) this.el.effectBanner.style.color = color;
+  }
+
+  setSlowTint(on) {
+    this.el.slowTint.classList.toggle("on", on);
+  }
+
+  // A brief centred toast when a powerup is picked up / activated.
+  flashPickup(text, color) {
+    const t = this.el.pickupToast;
+    t.textContent = text;
+    t.style.color = color || "#fff";
+    t.classList.remove("show");
+    void t.offsetWidth; // restart the animation
+    t.classList.add("show");
   }
 
   // Enemy icons: one silhouette per enemy still left to shoot in the wave.
