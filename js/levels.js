@@ -197,25 +197,49 @@ export const LOCATIONS = [
 ];
 
 // localStorage key the map editor writes to. When present, the game plays the
-// editor's levels instead of the built-in ones — but only in that browser, so
+// editor's levels instead of the shipped ones — but only in that browser, so
 // the editor stays a private iteration tool (it isn't linked from the menu).
 export const LEVELS_KEY = "touchshooter.levels";
 
-// The levels the game should play: an editor override if one exists in this
-// browser, otherwise the built-in LOCATIONS. Falls back safely on bad data.
+// The committed level file the game ships. Editing the live game for everyone =
+// replace this file (Export from the editor) and commit it.
+export const LEVELS_URL = "assets/levels.json";
+
+const validLevels = (d) => Array.isArray(d) && d.length && d.every((l) => l && l.stages);
+
+// Filled in by prefetchLevels(): the shipped assets/levels.json, once loaded.
+let shipped = null;
+
+// Load the committed level file once at startup. Safe to call repeatedly; failures
+// (e.g. file missing / offline) just leave the built-in LOCATIONS as the fallback.
+export async function prefetchLevels(url = LEVELS_URL) {
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (validLevels(data)) shipped = data;
+    }
+  } catch (e) {
+    /* keep built-in fallback */
+  }
+  return shipped;
+}
+
+// The levels the game should play, in priority order:
+//   1. an editor override saved in THIS browser (local iteration),
+//   2. the shipped assets/levels.json (what everyone plays),
+//   3. the built-in LOCATIONS (last-resort fallback).
 export function getLocations() {
   try {
     const raw = localStorage.getItem(LEVELS_KEY);
     if (raw) {
       const data = JSON.parse(raw);
-      if (Array.isArray(data) && data.length && data.every((l) => l && l.stages)) {
-        return data;
-      }
+      if (validLevels(data)) return data;
     }
   } catch (e) {
     /* ignore malformed override */
   }
-  return LOCATIONS;
+  return shipped || LOCATIONS;
 }
 
 // Build a location's static geometry under one node (disposed when leaving).

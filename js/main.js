@@ -1,13 +1,17 @@
 import { Game } from "./game.js";
+import { prefetchLevels } from "./levels.js";
 
-// Entry point: wait for Babylon (loaded from the CDN as a global), spin up the
-// engine, and wire the portrait/landscape hint.
-function boot() {
+// Entry point: wait for Babylon (loaded from the CDN as a global), load the
+// shipped levels, spin up the engine, and wire the portrait/landscape hint.
+async function boot() {
   if (!window.BABYLON) {
     document.getElementById("overlayText").textContent =
       "Could not load Babylon.js. Check your network connection and reload.";
     return;
   }
+
+  // Load the committed assets/levels.json before play (falls back to built-ins).
+  await prefetchLevels();
 
   const canvas = document.getElementById("renderCanvas");
   // eslint-disable-next-line no-new

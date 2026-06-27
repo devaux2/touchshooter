@@ -77,14 +77,22 @@ http://localhost:8080/editor.html
   properties panel for exact values.
 - **Stages = the rail** — each waypoint is a camera stop; they connect in order
   into the green rail path. Enemies/cover belong to the active stage.
-- **Save & Play** writes the level to your browser's `localStorage`; the game
-  then plays *your* level instead of the built-in ones — but only in your
-  browser, so it never affects other players until you commit it.
-- **Export** downloads `levels.json`; **Import** loads one back. To ship a level
-  for everyone, paste the exported array into `js/levels.js` (`LOCATIONS`).
+### Saving maps
 
-The editor reads and writes the exact level format the game consumes, so there's
-no conversion step.
+The game plays the committed **`assets/levels.json`** (the editor starts from it,
+so you're always editing what's live). There are two save paths:
+
+- **Save & Play** — writes the level to your browser's `localStorage` for an
+  instant preview. The game prefers this override, but *only in your browser*, so
+  it never affects other players. Use it to iterate quickly. **Clear saved**
+  removes the override so the game falls back to the shipped file.
+- **Export → commit** — to publish a map for everyone, click **Export**, save the
+  downloaded file as **`assets/levels.json`**, and commit/push it. That's the
+  only step that changes the live game.
+
+**Import** loads a `levels.json` back in to keep editing. The editor reads and
+writes the exact format the game consumes (`localStorage` override → shipped
+`assets/levels.json` → built-in `LOCATIONS` fallback), so there's no conversion.
 
 ## Project layout
 

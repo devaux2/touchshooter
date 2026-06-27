@@ -584,7 +584,7 @@ $("export").addEventListener("click", () => {
   a.download = "levels.json";
   a.click();
   URL.revokeObjectURL(a.href);
-  status("Exported levels.json");
+  status("Exported levels.json — put this file at assets/levels.json and commit to ship it to everyone.");
 });
 $("import").addEventListener("click", () => $("importFile").click());
 $("importFile").addEventListener("change", (e) => {
@@ -630,6 +630,27 @@ engine.runRenderLoop(() => scene.render());
 setView("2d");
 renderAll();
 status("Ready — Left-drag to pan, wheel to zoom. Pick a tool to place enemies, cover, and rail waypoints.");
+
+// With no local override, start from the live shipped levels (assets/levels.json)
+// so you're editing what everyone actually plays.
+(async () => {
+  if (localStorage.getItem(LEVELS_KEY)) return;
+  try {
+    const res = await fetch("assets/levels.json", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (Array.isArray(data) && data.length && data.every((l) => l && l.stages)) {
+      levels = data;
+      locIndex = 0;
+      stageIndex = 0;
+      selected = null;
+      renderAll();
+      status("Loaded live levels (assets/levels.json). Edit, then Export to ship.");
+    }
+  } catch (e) {
+    /* keep the built-in template */
+  }
+})();
 
 // Expose for quick debugging / headless tests.
 window.editor = { get levels() { return levels; }, buildMarkers, setView };
